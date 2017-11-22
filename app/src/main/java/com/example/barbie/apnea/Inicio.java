@@ -23,6 +23,8 @@ public class Inicio extends AppCompatActivity {
     private Button btn_reportes;
     public static BluetoothDevice dispositivoVinculado;
 
+    private static volatile ConexionBluetooth conexionBluetooth;
+    private static Thread threadBluetooth;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -55,8 +57,29 @@ public class Inicio extends AppCompatActivity {
             }
         });
 
+        configurarYLanzarThreads();
 
     }
+
+    private void configurarYLanzarThreads() {
+        if ( conexionBluetooth == null ) {
+            try {
+                conexionBluetooth = new ConexionBluetooth();
+            } catch (Exception e) {
+                Toast.makeText(this,e.getMessage(), Toast.LENGTH_LONG).show();
+                if (threadBluetooth != null && !threadBluetooth.isInterrupted()) {
+                    threadBluetooth.interrupt();
+                }
+                return;
+            }
+        }
+        threadBluetooth = new Thread(conexionBluetooth);
+        threadBluetooth.start();
+
+
+
+    }
+
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.menu_opciones, menu);
@@ -66,9 +89,8 @@ public class Inicio extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        if(dispositivoVinculado != null) {
-            //Toast.makeText(this,"Conectado a: " + dispositivoVinculado.getName(), Toast.LENGTH_SHORT );
-            Log.d("Inicio", "Conectado a: "+ dispositivoVinculado.getName());
+        if(conexionBluetooth.estaConectado()) {
+            Toast.makeText(this,"Conectado a: " + conexionBluetooth.nombreDispositivo(), Toast.LENGTH_SHORT ).show();
         }
     }
 
@@ -79,6 +101,7 @@ public class Inicio extends AppCompatActivity {
         int id = item.getItemId();
         if (id==R.id.menuItemSync) {
             Intent intent = new Intent(this, DeviceList.class);
+            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
             this.startActivity(intent);
         }
         /*if (id==R.id.opcion2) {
@@ -137,5 +160,9 @@ public class Inicio extends AppCompatActivity {
         if(appEncendida == false){
             Toast.makeText(this, "Encienda la aplicacion", Toast.LENGTH_SHORT).show();
         }
+    }
+
+    public static ConexionBluetooth getConexionBluetooth() {
+        return conexionBluetooth;
     }
 }

@@ -1,22 +1,20 @@
 package com.example.barbie.apnea;
 
-import android.bluetooth.BluetoothClass;
 import android.bluetooth.BluetoothDevice;
 import android.content.Intent;
 import android.os.Bundle;
-import android.support.design.widget.FloatingActionButton;
-import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.view.MenuItem;
 import android.view.View;
-import android.widget.Adapter;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
-import android.widget.EditText;
 import android.widget.ListView;
 import android.widget.TextView;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 
 public class FoundDeviceList extends AppCompatActivity {
 
@@ -24,6 +22,9 @@ public class FoundDeviceList extends AppCompatActivity {
     private TextView text_no_items;
     private TextView text_titulo;
     private ArrayList<BluetoothDevice> arrayListDisp;
+    private Map<String, BluetoothDevice> mapNombreADevice = new HashMap<>();
+
+    private volatile ConexionBluetooth conexionBluetooth;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -37,6 +38,7 @@ public class FoundDeviceList extends AppCompatActivity {
         getSupportActionBar().setTitle("Dispositivos encontrados");
 
 
+        conexionBluetooth = Inicio.getConexionBluetooth();
 
         listViewDisp = (ListView)findViewById(R.id.listView);
         text_no_items = (TextView)findViewById(R.id.text_no_disp);
@@ -50,19 +52,32 @@ public class FoundDeviceList extends AppCompatActivity {
 
         if(arrayListDisp.isEmpty()){
             noHayDispositivos();
-        }else {
+        } else {
             for (BluetoothDevice bt : arrayListDisp) {
                 //if(bt.getName().contains("Philips"))
-                list.add(bt.getName() + "\n" + bt.getAddress()); //Obtenemos los nombres y direcciones MAC de los disp. vinculados
+                String identificador = bt.getName() + "\n" + bt.getAddress();
+                list.add(identificador); //Obtenemos los nombres y direcciones MAC de los disp. vinculados
+                mapNombreADevice.put(identificador, bt);
             }
 
             ArrayAdapter adapter = new ArrayAdapter(this, android.R.layout.simple_list_item_1, list);
             listViewDisp.setAdapter(adapter);
+            listViewDisp.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+                @Override
+                public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
+                    BluetoothDevice item = mapNombreADevice.get(adapterView.getItemAtPosition(i));
+                    conexionBluetooth.vincular(item);
+                    // Volver a la pantalla de inicio
+                    Intent intent = new Intent(FoundDeviceList.this,DeviceList.class);
+                    intent.setFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
+                    FoundDeviceList.this.startActivityIfNeeded(intent, 0);
+                    finish();
+
+                }
+            });
+
             hayDispositivos();
         }
-
-
-
 
     }
 
@@ -71,7 +86,6 @@ public class FoundDeviceList extends AppCompatActivity {
         switch (item.getItemId()) {
             case android.R.id.home:
                 // todo: goto back activity from here
-
                 Intent intent = new Intent(FoundDeviceList.this, DeviceList.class);
                 intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
                 startActivity(intent);

@@ -34,21 +34,21 @@ import java.util.Set;
 
 public class DeviceList extends AppCompatActivity {
 
-
     private Button btnScan;
     private ListView listViewDeDispositivos;
-    private BluetoothAdapter myBluetooth = null;
     private Switch switch_bluetooth;
     public static String EXTRA_ADDRESS = "device_address";
     private TextView text_no_items;
     private TextView text_titulo;
     private ProgressBar progressBarCircular;
+
+    /*private BluetoothAdapter myBluetooth = null;
+     Guille  */
+    private volatile ConexionBluetooth conexionBluetooth;
     private Set<BluetoothDevice> arrayDeDispositivos;
     private ArrayList listaDeDispVinculados;
     private ArrayList<BluetoothDevice> listaDeDispEncontrados = new ArrayList<BluetoothDevice>();
     private Map<String, BluetoothDevice> mapNombreADevice = new HashMap<>();
-
-
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -62,14 +62,7 @@ public class DeviceList extends AppCompatActivity {
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         getSupportActionBar().setDisplayShowHomeEnabled(true);
 
-
-
-        //Se inicializa el manejador del adaptador bluetooth
-        myBluetooth = BluetoothAdapter.getDefaultAdapter();
-
-
-
-
+        conexionBluetooth = Inicio.getConexionBluetooth();
 
         //Se definen los componentes del layout
         btnScan = (Button)findViewById(R.id.btn_scan);
@@ -81,7 +74,7 @@ public class DeviceList extends AppCompatActivity {
 
         progressBarCircular.setVisibility(View.INVISIBLE);
 
-        arrayDeDispositivos = myBluetooth.getBondedDevices();
+        arrayDeDispositivos = conexionBluetooth.getDispositivosVinculados();
         mostrarComponentes();
 
         //Se intenta listar los dispositivos conectados, siempre y cuando el bluetooth este encendido...
@@ -94,8 +87,8 @@ public class DeviceList extends AppCompatActivity {
                 if(b == true){
                     Intent enableBT = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
                     startActivityForResult(enableBT, 1);
-                }else{
-                    myBluetooth.disable();
+                } else {
+                    conexionBluetooth.desactivarBT();
                     bluetoothDesactivado();
 
                 }
@@ -108,17 +101,19 @@ public class DeviceList extends AppCompatActivity {
             @Override
             public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
                 BluetoothDevice item = mapNombreADevice.get(adapterView.getItemAtPosition(i));
-                item.createBond();
-                Inicio.dispositivoVinculado = item;
-
-
+                // Volver a la pantalla de inicio
+                conexionBluetooth.vincular(item);
+                Intent intent = new Intent(DeviceList.this, Inicio.class);
+                intent.setFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
+                DeviceList.this.startActivityIfNeeded(intent, 0);
+                finish();
             }
         });
 
         btnScan.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                myBluetooth.startDiscovery();
+                conexionBluetooth.empezarBusqueda();
             }
         });
 
@@ -126,10 +121,10 @@ public class DeviceList extends AppCompatActivity {
         //se definen un broadcastReceiver que captura el broadcast del SO cuando captura los siguientes eventos:
         IntentFilter filter = new IntentFilter();
 
-        filter.addAction(BluetoothAdapter.ACTION_STATE_CHANGED); //Cambia el estado del Bluethoot (Acrtivado /Desactivado)
-        filter.addAction(BluetoothDevice.ACTION_FOUND); //Se encuentra un dispositivo bluethoot al realizar una busqueda
-        filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_STARTED); //Cuando se comienza una busqueda de bluethoot
-        filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED); //cuando la busqueda de bluethoot finaliza
+        filter.addAction(BluetoothAdapter.ACTION_STATE_CHANGED); //Cambia el estado del Bluetooth (Acrtivado /Desactivado)
+        filter.addAction(BluetoothDevice.ACTION_FOUND); //Se encuentra un dispositivo bluetooth al realizar una busqueda
+        filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_STARTED); //Cuando se comienza una busqueda de bluetooth
+        filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED); //cuando la busqueda de bluetooth finaliza
 
         //se define (registra) el handler que captura los broadcast anterirmente mencionados.
         registerReceiver(mReceiver, filter);
@@ -139,7 +134,7 @@ public class DeviceList extends AppCompatActivity {
 
     @Override
     //Cuando se detruye la Acivity se quita el registro de los brodcast. Apartir de este momento no se
-    //recibe mas broadcast del SO. del bluethoot
+    //recibe mas broadcast del SO. del bluetooth
     public void onDestroy() {
         unregisterReceiver(mReceiver);
 
@@ -149,7 +144,7 @@ public class DeviceList extends AppCompatActivity {
     @Override
     public void onResume(){
         super.onResume();
-        arrayDeDispositivos = myBluetooth.getBondedDevices();
+        arrayDeDispositivos =  conexionBluetooth.getDispositivosVinculados();
         mostrarComponentes();
     }
 
@@ -162,23 +157,14 @@ public class DeviceList extends AppCompatActivity {
                 }else{
                     bluetoothActivado();
                 }
-
-
     }
-
-
-
 
     private void listarDispositivosvinculados()
     {
-
         ArrayList list = new ArrayList();
         mapNombreADevice.clear();
-        if (arrayDeDispositivos.size()>0)
-        {
-            for(BluetoothDevice bt : arrayDeDispositivos)
-            {
-                //if(bt.getName().contains("Philips"))
+        if (arrayDeDispositivos.size()>0) {
+            for(BluetoothDevice bt : arrayDeDispositivos) {
                 String identificador = bt.getName() + "\n" + bt.getAddress();
                 list.add(identificador); //Obtenemos los nombres y direcciones MAC de los disp. vinculados
                 mapNombreADevice.put(identificador, bt);
@@ -188,8 +174,7 @@ public class DeviceList extends AppCompatActivity {
             listViewDeDispositivos.setVisibility(View.INVISIBLE);
             text_no_items.setText("No se han encontrado dispositivos vinculados");
             text_no_items.setVisibility(View.VISIBLE);
-        }
-        else {
+        } else {
             ArrayAdapter adapter = new ArrayAdapter(this, android.R.layout.simple_list_item_1, list);
             listViewDeDispositivos.setAdapter(adapter);
             text_no_items.setVisibility(View.INVISIBLE);
@@ -203,13 +188,13 @@ public class DeviceList extends AppCompatActivity {
     private final BroadcastReceiver mReceiver = new BroadcastReceiver() {
         public void onReceive(Context context, Intent intent) {
 
-            //Atraves del Intent obtengo el evento de Bluethoot que informo el broadcast del SO
+            //Atraves del Intent obtengo el evento de Bluetooth que informo el broadcast del SO
             String action = intent.getAction();
 
-            //Si cambio de estado el Bluethoot(Activado/desactivado)
+            //Si cambio de estado el Bluetooth(Activado/desactivado)
             if (BluetoothAdapter.ACTION_STATE_CHANGED.equals(action))
             {
-                //Obtengo el parametro, aplicando un Bundle, que me indica el estado del Bluethoot
+                //Obtengo el parametro, aplicando un Bundle, que me indica el estado del Bluetooth
                 final int state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR);
 
                 //Si esta activado
@@ -220,7 +205,7 @@ public class DeviceList extends AppCompatActivity {
                     bluetoothDesactivado();
                 }
             }
-            //Si se inicio la busqueda de dispositivos bluethoot
+            //Si se inicio la busqueda de dispositivos bluetooth
             else if (BluetoothAdapter.ACTION_DISCOVERY_STARTED.equals(action))
             {
                 //Creo la lista donde voy a mostrar los dispositivos encontrados
@@ -229,12 +214,12 @@ public class DeviceList extends AppCompatActivity {
                 //muestro el cuadro de dialogo de busqueda
                   estadoCargando();
             }
-            //Si finalizo la busqueda de dispositivos bluethoot
+            //Si finalizo la busqueda de dispositivos bluetooth
             else if (BluetoothAdapter.ACTION_DISCOVERY_FINISHED.equals(action))
             {
                 //se cierra el cuadro de dialogo de busqueda
                 //se inicia el activity DeviceListActivity pasandole como parametros, por intent,
-                //el listado de dispositovos encontrados
+                //el listado de dispositivos encontrados
                 Intent newIntent = new Intent(DeviceList.this, FoundDeviceList.class);
 
                 newIntent.putParcelableArrayListExtra("dispositivosEncontrados", listaDeDispEncontrados);
@@ -243,20 +228,27 @@ public class DeviceList extends AppCompatActivity {
 
 
             }
-            //si se encontro un dispositivo bluethoot
+            //si se encontro un dispositivo bluetooth
             else if (BluetoothDevice.ACTION_FOUND.equals(action))
             {
 
                 BluetoothDevice device = (BluetoothDevice) intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
 
-                listaDeDispEncontrados.add(device);
-                Toast.makeText(DeviceList.this,"Dispositivo Encontrado:" + device.getName(),Toast.LENGTH_SHORT);
+
+                if(!listaDeDispEncontrados.contains(device)) {
+                    listaDeDispEncontrados.add(device);
+                    Toast.makeText(DeviceList.this,"Dispositivo Encontrado:" + device.getName(),Toast.LENGTH_SHORT).show();
+                }
 
 
-            }else if(BluetoothDevice.ACTION_BOND_STATE_CHANGED.equals(action)){
+
+            } else if (BluetoothDevice.ACTION_BOND_STATE_CHANGED.equals(action)){
                 BluetoothDevice dispConectado = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
                 if(dispConectado.getBondState() == BluetoothDevice.BOND_BONDED || dispConectado.getBondState() == BluetoothDevice.BOND_BONDING){
-                    Inicio.dispositivoVinculado = dispConectado;
+                    conexionBluetooth.conectarDispositivo(dispConectado);
+                    intent = new Intent(DeviceList.this, Inicio.class);
+                    intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
+                    startActivityIfNeeded(intent, 0);
                     finish();
                 }
             }
@@ -268,8 +260,6 @@ public class DeviceList extends AppCompatActivity {
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
             case android.R.id.home:
-                // todo: goto back activity from here
-
                 Intent intent = new Intent(DeviceList.this, Inicio.class);
                 intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
                 startActivity(intent);
@@ -280,10 +270,6 @@ public class DeviceList extends AppCompatActivity {
                 return super.onOptionsItemSelected(item);
         }
     }
-
-
-
-
 
     public void bluetoothActivado(){
         switch_bluetooth.setChecked(true);
@@ -313,14 +299,14 @@ public class DeviceList extends AppCompatActivity {
         getSupportActionBar().setTitle("Conexión");
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         getSupportActionBar().setDisplayShowHomeEnabled(true);
-        if(myBluetooth.isEnabled()) {
+        if(conexionBluetooth.estaActivadoElBT()) {
             bluetoothActivado();
-        }else{
+        } else {
             bluetoothDesactivado();
         }
-        if (myBluetooth == null)
+        if ( !conexionBluetooth.tieneBluetooth() )
         {
-            //si el celular no soporta bluethoot
+            //si el celular no soporta bluetooth
             text_no_items.setText("El Bluetooth no es soportado por este dispositivo movil.");
             text_no_items.setTextColor(Color.RED);
             switch_bluetooth.setEnabled(false);
