@@ -67,12 +67,12 @@ public class FoundDeviceList extends AppCompatActivity {
                 public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
                     BluetoothDevice item = mapNombreADevice.get(adapterView.getItemAtPosition(i));
                     conexionBluetooth.vincular(item);
+                    conexionBluetooth.conectarDispositivo(item);
                     // Volver a la pantalla de inicio
-                    Intent intent = new Intent(FoundDeviceList.this,DeviceList.class);
+                    Intent intent = new Intent(FoundDeviceList.this,Inicio.class);
                     intent.setFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
-                    FoundDeviceList.this.startActivityIfNeeded(intent, 0);
+                    FoundDeviceList.this.startActivity(intent);
                     finish();
-
                 }
             });
 

@@ -89,8 +89,12 @@ public class Inicio extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        //Log.d("Inicio", "ejecute onResume");
         if(conexionBluetooth.estaConectado()) {
             Toast.makeText(this,"Conectado a: " + conexionBluetooth.nombreDispositivo(), Toast.LENGTH_SHORT ).show();
+            setTitle("Sleep APNEA [" + conexionBluetooth.nombreDispositivo() + "]");
+        } else {
+            setTitle("Sleep APNEA");
         }
     }
 

@@ -102,10 +102,10 @@ public class DeviceList extends AppCompatActivity {
             public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
                 BluetoothDevice item = mapNombreADevice.get(adapterView.getItemAtPosition(i));
                 // Volver a la pantalla de inicio
-                conexionBluetooth.vincular(item);
+                conexionBluetooth.conectarDispositivo(item);
                 Intent intent = new Intent(DeviceList.this, Inicio.class);
                 intent.setFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
-                DeviceList.this.startActivityIfNeeded(intent, 0);
+                DeviceList.this.startActivity(intent);
                 finish();
             }
         });
@@ -247,8 +247,8 @@ public class DeviceList extends AppCompatActivity {
                 if(dispConectado.getBondState() == BluetoothDevice.BOND_BONDED || dispConectado.getBondState() == BluetoothDevice.BOND_BONDING){
                     conexionBluetooth.conectarDispositivo(dispConectado);
                     intent = new Intent(DeviceList.this, Inicio.class);
-                    intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
-                    startActivityIfNeeded(intent, 0);
+                    intent.setFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
+                    startActivity(intent);
                     finish();
                 }
             }
@@ -261,7 +261,7 @@ public class DeviceList extends AppCompatActivity {
         switch (item.getItemId()) {
             case android.R.id.home:
                 Intent intent = new Intent(DeviceList.this, Inicio.class);
-                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
+                intent.setFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
                 startActivity(intent);
                 finish();
                 return true;
